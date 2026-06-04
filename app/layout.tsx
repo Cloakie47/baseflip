@@ -55,6 +55,10 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     images: [OG_IMAGE],
   },
+  other: {
+    // Base.dev ownership verification.
+    "base:app_id": "6a210feefba5020fc7b68dc8",
+  },
 };
 
 export default function RootLayout({
