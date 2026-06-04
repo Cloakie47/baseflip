@@ -129,7 +129,6 @@ export default function Coin({ result, isFlipping, outcome, size = 300 }: CoinPr
         </motion.div>
 
         <WinGlow show={outcome === 'win' && !isFlipping} />
-        <LoseEffect show={outcome === 'lose' && !isFlipping} />
       </motion.div>
     </div>
   )
@@ -153,63 +152,3 @@ function WinGlow({ show }: { show: boolean }) {
   )
 }
 
-function LoseEffect({ show }: { show: boolean }) {
-  if (!show) return null
-  return (
-    <>
-      <motion.div
-        style={{
-          position: 'absolute',
-          inset: '-14%',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(255,77,94,0.5) 0%, rgba(255,77,94,0) 60%)',
-          pointerEvents: 'none',
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 0.9, 0] }}
-        transition={{ duration: 0.55, ease: 'easeOut' }}
-      />
-      <svg
-        viewBox="0 0 200 200"
-        width="100%"
-        height="100%"
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-      >
-        <motion.path
-          d="M104 30 L93 72 L114 96 L88 120 L101 148 L91 174"
-          fill="none"
-          stroke="rgba(255,255,255,0.5)"
-          strokeWidth="5.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: 0.32, ease: 'easeOut' }}
-        />
-        <motion.path
-          d="M104 30 L93 72 L114 96 L88 120 L101 148 L91 174"
-          fill="none"
-          stroke="#0b1326"
-          strokeOpacity="0.8"
-          strokeWidth="3"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: 0.32, ease: 'easeOut' }}
-        />
-        <motion.path
-          d="M114 96 L138 102"
-          fill="none"
-          stroke="#0b1326"
-          strokeOpacity="0.75"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: 0.22, ease: 'easeOut', delay: 0.16 }}
-        />
-      </svg>
-    </>
-  )
-}
