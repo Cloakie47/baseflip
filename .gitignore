@@ -1,0 +1,14 @@
+node_modules
+.next
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+out
+
+# Per-machine Claude Code settings (allowlists, hooks).
+.claude/settings.local.json
