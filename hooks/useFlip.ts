@@ -1,21 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { decodeEventLog, encodeFunctionData, type Address, type Hex } from "viem";
+import { decodeEventLog, type Address, type Hex } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useAccount,
   useChainId,
-  useSendTransaction,
   useWaitForTransactionReceipt,
+  useWriteContract,
 } from "wagmi";
 import { base } from "wagmi/chains";
-import {
-  BASEFLIP_ABI,
-  BASEFLIP_ADDRESS,
-  BASEFLIP_DATA_SUFFIX,
-  Side,
-} from "@/config/baseflip";
+import { BASEFLIP_ABI, BASEFLIP_ADDRESS, Side } from "@/config/baseflip";
 
 export type FlipPhase =
   | "idle"
@@ -119,11 +114,11 @@ export function useFlip() {
   const [error, setError] = useState<string | null>(null);
   const currentChoiceRef = useRef<Side | null>(null);
 
-  const sendTx = useSendTransaction();
+  const writeContract = useWriteContract();
   const txReceipt = useWaitForTransactionReceipt({
-    hash: sendTx.data,
+    hash: writeContract.data,
     chainId: base.id,
-    query: { enabled: Boolean(sendTx.data) },
+    query: { enabled: Boolean(writeContract.data) },
   });
 
   const reset = useCallback(() => {
@@ -131,8 +126,8 @@ export function useFlip() {
     setOutcome(null);
     setError(null);
     currentChoiceRef.current = null;
-    sendTx.reset();
-  }, [sendTx]);
+    writeContract.reset();
+  }, [writeContract]);
 
   const flip = useCallback(
     async (choice: Side) => {
@@ -153,18 +148,12 @@ export function useFlip() {
       setPhase("awaiting-wallet");
 
       try {
-        const callData = encodeFunctionData({
+        await writeContract.writeContractAsync({
+          chainId: base.id,
+          address: BASEFLIP_ADDRESS,
           abi: BASEFLIP_ABI,
           functionName: "flip",
           args: [choice],
-        });
-        // ERC-8021 Schema 0 suffix for Base builder attribution. Contract ignores
-        // trailing bytes past the uint8 arg, so it's safe to concatenate.
-        const data = `${callData}${BASEFLIP_DATA_SUFFIX.slice(2)}` as Hex;
-        await sendTx.sendTransactionAsync({
-          chainId: base.id,
-          to: BASEFLIP_ADDRESS,
-          data,
         });
         setPhase("confirming");
       } catch (e) {
@@ -186,7 +175,7 @@ export function useFlip() {
         setPhase("error");
       }
     },
-    [address, isWrongChain, sendTx],
+    [address, isWrongChain, writeContract],
   );
 
   // Decode the Flipped event from the receipt and finalize.
