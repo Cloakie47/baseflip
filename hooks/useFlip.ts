@@ -1,16 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { decodeEventLog, type Address, type Hex } from "viem";
+import { decodeEventLog, encodeFunctionData, type Address, type Hex } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useAccount,
   useChainId,
+  useSendTransaction,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
 import { base } from "wagmi/chains";
-import { BASEFLIP_ABI, BASEFLIP_ADDRESS, Side } from "@/config/baseflip";
+import {
+  BASEFLIP_ABI,
+  BASEFLIP_ADDRESS,
+  BASEFLIP_DATA_SUFFIX,
+  Side,
+} from "@/config/baseflip";
 
 export type FlipPhase =
   | "idle"
@@ -105,29 +111,33 @@ function decodeFlippedLog(
 
 export function useFlip() {
   const queryClient = useQueryClient();
-  const { address } = useAccount();
+  const { address, connector } = useAccount();
   const chainId = useChainId();
   const isWrongChain = chainId !== base.id;
 
   const [phase, setPhase] = useState<FlipPhase>("idle");
   const [outcome, setOutcome] = useState<FlipOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeHash, setActiveHash] = useState<Hex | undefined>();
   const currentChoiceRef = useRef<Side | null>(null);
 
   const writeContract = useWriteContract();
+  const sendTx = useSendTransaction();
   const txReceipt = useWaitForTransactionReceipt({
-    hash: writeContract.data,
+    hash: activeHash,
     chainId: base.id,
-    query: { enabled: Boolean(writeContract.data) },
+    query: { enabled: Boolean(activeHash) },
   });
 
   const reset = useCallback(() => {
     setPhase("idle");
     setOutcome(null);
     setError(null);
+    setActiveHash(undefined);
     currentChoiceRef.current = null;
     writeContract.reset();
-  }, [writeContract]);
+    sendTx.reset();
+  }, [writeContract, sendTx]);
 
   const flip = useCallback(
     async (choice: Side) => {
@@ -144,17 +154,41 @@ export function useFlip() {
 
       setError(null);
       setOutcome(null);
+      setActiveHash(undefined);
       currentChoiceRef.current = choice;
       setPhase("awaiting-wallet");
 
+      // Base Account smart wallet: keep the writeContract path so the wallet's
+      // AA flow is preserved and base.dev credits via the app_id mapping.
+      // Any other connector (MetaMask, Rabby, generic injected): append the
+      // ERC-8021 builder code suffix to the calldata so base.dev's indexer
+      // credits these EOA flips to the same builder code.
+      const isBaseAccount = connector?.id === "baseAccount";
+
       try {
-        await writeContract.writeContractAsync({
-          chainId: base.id,
-          address: BASEFLIP_ADDRESS,
-          abi: BASEFLIP_ABI,
-          functionName: "flip",
-          args: [choice],
-        });
+        let hash: Hex;
+        if (isBaseAccount) {
+          hash = await writeContract.writeContractAsync({
+            chainId: base.id,
+            address: BASEFLIP_ADDRESS,
+            abi: BASEFLIP_ABI,
+            functionName: "flip",
+            args: [choice],
+          });
+        } else {
+          const callData = encodeFunctionData({
+            abi: BASEFLIP_ABI,
+            functionName: "flip",
+            args: [choice],
+          });
+          const data = `${callData}${BASEFLIP_DATA_SUFFIX.slice(2)}` as Hex;
+          hash = await sendTx.sendTransactionAsync({
+            chainId: base.id,
+            to: BASEFLIP_ADDRESS,
+            data,
+          });
+        }
+        setActiveHash(hash);
         setPhase("confirming");
       } catch (e) {
         currentChoiceRef.current = null;
@@ -175,7 +209,7 @@ export function useFlip() {
         setPhase("error");
       }
     },
-    [address, isWrongChain, writeContract],
+    [address, connector, isWrongChain, writeContract, sendTx],
   );
 
   // Decode the Flipped event from the receipt and finalize.
