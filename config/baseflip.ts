@@ -15,10 +15,13 @@ export const BASEFLIP_BUILDER_CODE = "bc_ykjch1zi";
 const ERC8021_MARKER = "80218021802180218021802180218021";
 
 function buildErc8021Suffix(codes: readonly string[]): Hex {
+  // Schema 0 layout: codes ∥ codesLength (1 byte) ∥ schemaId (1 byte) ∥ ercMarker (16 bytes).
+  // Parsers read backwards from the end; codesLength sits immediately before
+  // schemaId, NOT before the codes bytes. Mirrors ox's Attribution.toDataSuffix.
   const joined = codes.join(",");
   const codesHex = stringToHex(joined).slice(2);
   const codesLen = joined.length.toString(16).padStart(2, "0");
-  return `0x${codesLen}${codesHex}00${ERC8021_MARKER}` as Hex;
+  return `0x${codesHex}${codesLen}00${ERC8021_MARKER}` as Hex;
 }
 
 export const BASEFLIP_DATA_SUFFIX: Hex = buildErc8021Suffix([
